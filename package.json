@@ -1,11 +1,18 @@
 {
   "name": "geohash-poly",
   "version": "0.0.1",
-  "description": "Transform a geoJSON (Multi)Polygon to a list of geohashes that form it.",
+  "description": "Transform a GeoJSON Polygon or MultiPolygon to a list of geohashes that form it.",
   "main": "index.js",
-  "repository": "",
-  "author": "Derrick Pelletier",
-  "license": "BSD",
+  "repository": {
+    "type": "git",
+    "url": "http://github.com/derrickpelletier/geohash-poly.git"
+  },
+  "author": {
+    "name": "Derrick Pelletier",
+    "email": "derrick@dpelletier.com",
+    "url": "http://dpelletier.com"
+  },
+  "license": "MIT",
   "readmeFilename": "README.md",
   "dependencies": {
     "ngeohash": "~0.2.0",

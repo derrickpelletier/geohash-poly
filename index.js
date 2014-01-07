@@ -27,9 +27,11 @@ module.exports = function (geoJSONCoords, precision) {
     hashList = hashList.concat(hashesInPoly(geoJSONCoords[i], precision));
   }
 
-  hashList = hashList.filter(function (elem, pos, arr) {
-    return arr.indexOf(elem) === pos;
-  });
+  if(isMulti) {
+    hashList = hashList.filter(function (elem, pos, arr) {
+      return arr.indexOf(elem) === pos;
+    });
+  }
 
   return hashList;
 };

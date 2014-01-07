@@ -1,6 +1,6 @@
 # Geohash-poly
 
-Transform a geoJSON (Multi)Polygon to a list of geohashes that cover it.
+Transform a GeoJSON (Multi)Polygon to a list of geohashes that cover it.
 
 Currently only includes hashes whose centroid falls within the poly itself.
 This does not create 100% coverage, but I could consider adding this if there is a need.
