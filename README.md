@@ -17,36 +17,7 @@ var hashList =  geohashpoly(polygon, 7);
 
 Results in:
 ```
-[ 'c22zrgg',
-  'c22zrgu',
-  'c22zrgv',
-  'c22zrgy',
-  'c22zrgz',
-  'c23p25b',
-  'c22zrge',
-  'c22zrgs',
-  'c22zrgt',
-  'c22zrgw',
-  'c22zrgx',
-  'c23p258',
-  'c23p259',
-  'c23p25d',
-  'c22zrg7',
-  'c22zrgk',
-  'c22zrgm',
-  'c22zrgq',
-  'c22zrgr',
-  'c23p252',
-  'c23p253',
-  'c23p256',
-  'c22zrg5',
-  'c22zrgh',
-  'c22zrgj',
-  'c22zrgn',
-  'c22zrgp',
-  'c23p250',
-  'c23p251',
-  'c23p254' ]
+[ 'c22zrgg', 'c22zrgu', 'c22zrgv', 'c22zrgy', 'c22zrgz', 'c23p25b', 'c22zrge', 'c22zrgs', 'c22zrgt', 'c22zrgw', 'c22zrgx', 'c23p258', 'c23p259', 'c23p25d', 'c22zrg7', 'c22zrgk', 'c22zrgm', 'c22zrgq', 'c22zrgr', 'c23p252', 'c23p253', 'c23p256', 'c22zrg5', 'c22zrgh', 'c22zrgj', 'c22zrgn', 'c22zrgp', 'c23p250', 'c23p251', 'c23p254' ]
 ```
 
 -------
