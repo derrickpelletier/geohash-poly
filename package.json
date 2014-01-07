@@ -1,0 +1,14 @@
+{
+  "name": "geohash-poly",
+  "version": "0.0.1",
+  "description": "Transform a geoJSON (Multi)Polygon to a list of geohashes that form it.",
+  "main": "index.js",
+  "repository": "",
+  "author": "Derrick Pelletier",
+  "license": "BSD",
+  "readmeFilename": "README.md",
+  "dependencies": {
+    "ngeohash": "~0.2.0",
+    "point-in-polygon": "0.0.0"
+  }
+}
