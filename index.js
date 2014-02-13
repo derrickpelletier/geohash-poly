@@ -96,11 +96,15 @@ module.exports.stream = function (geoJSONCoords, precision) {
 
 /**
  * intializes the Hasher, but processes the results before returning an array.
- * TODO: make this actually work
  */
 module.exports.sync = function (geoJSONCoords, precision) {
   var hasher = new Hasher(geoJSONCoords, precision);
   var results = [];
+
+  while(hasher.geojson.length) {
+    results = results.concat(hasher.getNextRow());
+  }
+
   return results;
 };
 
