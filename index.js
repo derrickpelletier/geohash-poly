@@ -1,5 +1,7 @@
-var geohash = require('ngeohash'),
-  pip = require('point-in-polygon');
+var Readable = require('stream').Readable,
+  geohash = require('ngeohash'),
+  pip = require('point-in-polygon'),
+  util = require('util');
 
 
 /**
@@ -18,23 +20,43 @@ var inside = function (point, geopoly) {
  * Calculate geohashes of specified precision that cover the (Multi)Polygon provided
  * returns array of hashes with no duplicates
  */
-module.exports = function (geoJSONCoords, precision) {
-  var hashList = [];
-  var isMulti = Array.isArray(geoJSONCoords[0][0][0]);
-  if(!isMulti) geoJSONCoords = [geoJSONCoords];
+var Hasher = function (geoJSONCoords, precision) {
+  this.isMulti = Array.isArray(geoJSONCoords[0][0][0]);
+  this.geojson = !this.isMulti ? [geoJSONCoords] : geoJSONCoords;
+  this.precision = precision;
+  this.hashes = [];
+  Readable.call(this);
 
-  for(var i = 0; i < geoJSONCoords.length; i++) {
-    hashList = hashList.concat(hashesInPoly(geoJSONCoords[i], precision));
+  for(var i = 0; i < this.geojson.length; i++) {
+    this.hashesInPoly(this.geojson[i], this.precision);
   }
 
-  if(isMulti) {
-    hashList = hashList.filter(function (elem, pos, arr) {
-      return arr.indexOf(elem) === pos;
-    });
-  }
+  // done, trigger stream end.
+  this.addAnother(null)
+}
 
-  return hashList;
-};
+util.inherits(Hasher, Readable);
+var stuff_to_push = ['pizza', 'whatever', 'sauce', 'burgers', 'yep', null];
+
+
+/**
+ * adds a hash or set of hashes to the stream buffer.
+ * emits readable to tell the stream there is more available.
+ */
+Hasher.prototype.addAnother = function (hashes) {
+  var self = this;
+  if(!Array.isArray(hashes)) hashes = [hashes];
+  self.hashes = self.hashes.concat(hashes);
+  self.emit('readable');
+}
+
+Hasher.prototype._read = function (size) {
+  if(!this.hashes.length) return this.push('');
+
+  while(this.hashes.length) {
+    this.push(this.hashes.shift());
+  }
+}
 
 
 /**
@@ -46,8 +68,9 @@ module.exports = function (geoJSONCoords, precision) {
  *
  * returns array of hashes that make up the polygon, holes accounted for.
  */
-var hashesInPoly = function (polygonPoints, precision) {
-  var bounding = polyToBB(polygonPoints),
+Hasher.prototype.hashesInPoly = function (polygonPoints, precision) {
+  var self = this,
+    bounding = polyToBB(polygonPoints),
     allHashes = [],
     rowHash = geohash.encode(bounding[2], bounding[1], precision),
     rowBox = geohash.decode_bbox(rowHash);
@@ -57,7 +80,7 @@ var hashesInPoly = function (polygonPoints, precision) {
       columnBox = rowBox;
     while (isWest(columnBox[1], bounding[3])) {
       if(inside(geohash.decode(columnHash), polygonPoints)) {
-        allHashes.push(columnHash);
+        self.addAnother(columnHash);
       }
       columnHash = geohash.neighbor(columnHash, [0, 1]);
       columnBox = geohash.decode_bbox(columnHash);
@@ -66,8 +89,11 @@ var hashesInPoly = function (polygonPoints, precision) {
     rowBox = geohash.decode_bbox(rowHash);
   
   } while (rowBox[2] > bounding[0]);
+}
 
-  return allHashes;
+module.exports.stream = function (geoJSONCoords, precision) {
+  var hasher = new Hasher(geoJSONCoords, precision);
+  return hasher;
 }
 
 
