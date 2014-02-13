@@ -17,84 +17,92 @@ var inside = function (point, geopoly) {
 
 
 /*
+ * Hasher, extends Readable
+ * a stream that will provide a readable list of hashes, row by row.
+ *
  * Calculate geohashes of specified precision that cover the (Multi)Polygon provided
- * returns array of hashes with no duplicates
+ * Note, duplicates may occur.
  */
 var Hasher = function (geoJSONCoords, precision) {
   this.isMulti = Array.isArray(geoJSONCoords[0][0][0]);
   this.geojson = !this.isMulti ? [geoJSONCoords] : geoJSONCoords;
   this.precision = precision;
-  this.hashes = [];
   Readable.call(this);
-
-  for(var i = 0; i < this.geojson.length; i++) {
-    this.hashesInPoly(this.geojson[i], this.precision);
-  }
-
-  // done, trigger stream end.
-  this.addAnother(null)
 }
-
 util.inherits(Hasher, Readable);
-var stuff_to_push = ['pizza', 'whatever', 'sauce', 'burgers', 'yep', null];
 
 
 /**
- * adds a hash or set of hashes to the stream buffer.
- * emits readable to tell the stream there is more available.
+ * _read(), for Readable
+ * gets the next row of hashes, can technically be large, but still throttles processing effectively
+ * pushes each hash to the buffer individually
+ * if there are no polygons remaining in the geojson, push null to end stream
  */
-Hasher.prototype.addAnother = function (hashes) {
-  var self = this;
-  if(!Array.isArray(hashes)) hashes = [hashes];
-  self.hashes = self.hashes.concat(hashes);
-  self.emit('readable');
-}
-
 Hasher.prototype._read = function (size) {
-  if(!this.hashes.length) return this.push('');
+  if(!this.geojson.length) return this.push(null);
 
-  while(this.hashes.length) {
-    this.push(this.hashes.shift());
+  var hashes = this.getNextRow();
+
+  if(!hashes.length) return this.push('');
+  while(hashes.length) {
+    this.push(hashes.shift());
   }
-}
+
+};
 
 
 /**
- * get all the hashes for a given polygon
- * accepts polygon in geojson format (not multipoly): [[[lon, lat]]]
- *
- * note: hashes are considered "inside" if the center point of the hash falls within the polygon.
- * this does not create 100% coverage.
- *
- * returns array of hashes that make up the polygon, holes accounted for.
+ * getNextRow()
+ * will get the next row of geohashes for the current index-0 polygon in the list.
+ * rowHash persists so that it is available on the next iteration while the poly is still the same
  */
-Hasher.prototype.hashesInPoly = function (polygonPoints, precision) {
-  var self = this,
-    bounding = polyToBB(polygonPoints),
-    allHashes = [],
-    rowHash = geohash.encode(bounding[2], bounding[1], precision),
-    rowBox = geohash.decode_bbox(rowHash);
+Hasher.prototype.getNextRow = function () {
+  var poly = this.geojson[0],
+    bounding = polyToBB(poly),
+    rowHashes = [];
 
-  do {
-    var columnHash = rowHash,
-      columnBox = rowBox;
-    while (isWest(columnBox[1], bounding[3])) {
-      if(inside(geohash.decode(columnHash), polygonPoints)) {
-        self.addAnother(columnHash);
-      }
-      columnHash = geohash.neighbor(columnHash, [0, 1]);
-      columnBox = geohash.decode_bbox(columnHash);
-    }
-    rowHash = geohash.neighbor(rowHash, [-1, 0]);
-    rowBox = geohash.decode_bbox(rowHash);
+  if(!this.rowHash) this.rowHash = geohash.encode(bounding[2], bounding[1], this.precision);
+
+  var rowBox = geohash.decode_bbox(this.rowHash),
+    columnHash = this.rowHash,
+    columnBox = rowBox;
+ 
+  while (isWest(columnBox[1], bounding[3])) {
+    if(inside(geohash.decode(columnHash), poly)) rowHashes.push(columnHash);
+
+    columnHash = geohash.neighbor(columnHash, [0, 1]);
+    columnBox = geohash.decode_bbox(columnHash);
+  }
   
-  } while (rowBox[2] > bounding[0]);
-}
+  // get the hash for the next row.
+  this.rowHash = geohash.neighbor(this.rowHash, [-1, 0]);
 
+  if(rowBox[2] <= bounding[0]) {
+    this.geojson.shift();
+    this.rowHash = null;
+  }
+
+  return rowHashes;
+};
+
+
+/**
+ * initializes the Hasher, as a stream
+ */
 module.exports.stream = function (geoJSONCoords, precision) {
+  return new Hasher(geoJSONCoords, precision);
+};
+
+
+/**
+ * intializes the Hasher, but processes the results before returning an array.
+ * TODO: make this actually work
+ */
+module.exports.sync = function (geoJSONCoords, precision) {
   var hasher = new Hasher(geoJSONCoords, precision);
-  return hasher;
-}
+  var results = [];
+  return results;
+};
 
 
 /**
