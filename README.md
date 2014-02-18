@@ -11,6 +11,9 @@ Method used is pretty brute-force, but still relatively quick compared to altern
 
 ## Streaming
 Hashes can be streamed. Each _read will generate a row of hashes into buffer, as some form of throttling. This allows massive polygons with high precision hashes to avoid memory constraint issues. If your polys have the potential to hit memory issues, use this method.
+
+If you specify rowMode as true, such as `.stream(poly, precision, rowMode)`, each chunk in the stream will be an array using streams2 objectMode.
+
 ```javascript
 
 var through2 = require('through2');
