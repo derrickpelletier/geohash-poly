@@ -23,11 +23,24 @@ var inside = function (point, geopoly) {
  * Calculate geohashes of specified precision that cover the (Multi)Polygon provided
  * Note, duplicates may occur.
  */
-var Hasher = function (geoJSONCoords, precision) {
-  this.isMulti = Array.isArray(geoJSONCoords[0][0][0]);
-  this.geojson = !this.isMulti ? [geoJSONCoords] : geoJSONCoords;
-  this.precision = precision;
-  Readable.call(this);
+var Hasher = function (options) {
+  var defaults = {
+    precision: 6,
+    rowMode: false,
+    geojson: []
+  }
+  options = options || {};
+  for (var attrname in defaults) {
+    this[attrname] = options.hasOwnProperty(attrname) && (options[attrname] !== null && typeof options[attrname] !== 'undefined') ? options[attrname] : defaults[attrname];
+  }
+
+  this.isMulti = Array.isArray(this.geojson[0][0][0]);
+  this.geojson = !this.isMulti ? [this.geojson] : this.geojson;
+  this.buffer = [];
+
+  Readable.call(this, {
+    objectMode: this.rowMode
+  });
 }
 util.inherits(Hasher, Readable);
 
@@ -39,15 +52,26 @@ util.inherits(Hasher, Readable);
  * if there are no polygons remaining in the geojson, push null to end stream
  */
 Hasher.prototype._read = function (size) {
-  if(!this.geojson.length) return this.push(null);
+  // still some hashes in the buffer, no rush.
+  if(this.buffer.length) {
+    return this.push(this.buffer.shift());
+  }
 
-  var hashes = this.getNextRow();
+  var hashes = [];
 
+  // Iterate over the poly rows until we get some hashes, or the polys are done.
+  while(this.geojson.length && !hashes.length) {
+    hashes = this.getNextRow();
+  }
+
+  if(!this.geojson.length && !hashes.length) return this.push(null);
   if(!hashes.length) return this.push('');
+  if(this.rowMode) return this.push(hashes);
+
   while(hashes.length) {
     this.push(hashes.shift());
   }
-
+  this.buffer = this.buffer.concat(hashes);
 };
 
 
@@ -89,8 +113,12 @@ Hasher.prototype.getNextRow = function () {
 /**
  * initializes the Hasher, as a stream
  */
-module.exports.stream = function (geoJSONCoords, precision) {
-  return new Hasher(geoJSONCoords, precision);
+module.exports.stream = function (geoJSONCoords, precision, rowMode) {
+  return new Hasher({
+    geojson: geoJSONCoords,
+    precision: precision,
+    rowMode: rowMode ? true : false
+  });
 };
 
 
@@ -98,7 +126,10 @@ module.exports.stream = function (geoJSONCoords, precision) {
  * intializes the Hasher, but processes the results before returning an array.
  */
 module.exports.sync = function (geoJSONCoords, precision) {
-  var hasher = new Hasher(geoJSONCoords, precision);
+  var hasher = new Hasher({
+    geojson: geoJSONCoords,
+    precision: precision
+  });
   var results = [];
 
   while(hasher.geojson.length) {
