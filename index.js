@@ -65,7 +65,6 @@ Hasher.prototype._read = function (size) {
   }
 
   if(!this.geojson.length && !hashes.length) return this.push(null);
-  if(!hashes.length) return this.push('');
   if(this.rowMode) return this.push(hashes);
 
   while(hashes.length) {
