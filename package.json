@@ -16,7 +16,8 @@
   "readmeFilename": "README.md",
   "dependencies": {
     "ngeohash": "~0.2.0",
-    "point-in-polygon": "0.0.0"
+    "point-in-polygon": "0.0.0",
+    "turf": "0.0.119"
   },
   "devDependencies": {
     "through2": "~0.4.0"
