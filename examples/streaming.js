@@ -25,14 +25,14 @@ rowStream
   }));
 
 
-// var stream = hasher.stream(difficult, 7),
-//   b = 0;
+var stream = hasher.stream(difficult, 7),
+  b = 0;
 
-// stream
-//   .on('end', function () {
-//     console.log("Hashes from singles mode:", b);
-//   })
-//   .pipe(through2.obj(function (chunk, enc, callback) {
-//     b++;
-//     callback();
-//   }));
+stream
+  .on('end', function () {
+    console.log("Hashes from singles mode:", b);
+  })
+  .pipe(through2(function (chunk, enc, callback) {
+    b++;
+    callback();
+  }));
