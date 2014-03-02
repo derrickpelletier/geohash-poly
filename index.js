@@ -1,41 +1,27 @@
 var Readable = require('stream').Readable,
   geohash = require('ngeohash'),
   pip = require('point-in-polygon'),
-  util = require('util'),
-  turf = require('turf');
-
+  turf = require('turf'),
+  through2 = require('through2'),
+  async = require('async');
 
 /**
  * utilizing point-in-poly but providing support for geojson polys and holes.
  */
 var inside = function (point, features) {
-  var inside = 0;
-  var geopoly = features.features[0]
-
-  if(geopoly.type !== "Polygon" && geopoly.type !== "MultiPolygon") {
-    return false;
-  }
+  var geopoly = features.features[0],
+    inside = 0;
   
-
-  try {
-    for(var a = 0; a < geopoly.coordinates.length; a++) {
-      var polygon = geopoly.coordinates[a];
-      if(geopoly.type === "Polygon") {
-        // console.log(geopoly.type, geopoly.type === "Polygon", ring)
-        inside += pip([point.longitude, point.latitude], polygon) ? 1 : 0;  
-      } else {
-        for(var b = 0; b < polygon.length; b++) {
-          var ring = polygon[b];
-          inside += pip([point.longitude, point.latitude], ring) ? 1 : 0;
-        }
-      }
-    }
-  } catch (err) {
-    console.log(features, err)
-    throw err
-  }
+  if(geopoly.type !== "Polygon" && geopoly.type !== "MultiPolygon") return false;
+  
+  var shape = geopoly.type === 'Polygon' ? [geopoly.coordinates] : geopoly.coordinates;
+  shape.forEach(function (polygon, ind) {
+    polygon.forEach(function (ring, ind) {
+      if(pip([point.longitude, point.latitude], ring)) inside++;
+    });
+  });
   return inside % 2;
-}
+};
 
 
 /*
@@ -58,93 +44,96 @@ var Hasher = function (options) {
 
   this.isMulti = Array.isArray(this.geojson[0][0][0]);
   this.geojson = !this.isMulti ? [this.geojson] : this.geojson;
-  
-  for(var i = 0; i < this.geojson.length; i++) {
-    this.geojson[i] = turf.polygon(this.geojson[i]);
-  }
-
-  this.buffer = [];
+  this.geojson = this.geojson.map(function (el) {
+    return turf.polygon(el);
+  });
 
   Readable.call(this, {
     objectMode: this.rowMode
   });
 }
-util.inherits(Hasher, Readable);
+require('util').inherits(Hasher, Readable);
 
 
 /**
  * _read(), for Readable
- * gets the next row of hashes, can technically be large, but still throttles processing effectively
- * pushes each hash to the buffer individually
+ * gets your next row of hashes.
+ * If not in rowMode, will push each hash to buffer
  * if there are no polygons remaining in the geojson, push null to end stream
  */
 Hasher.prototype._read = function (size) {
-  // still some hashes in the buffer, no rush.
-  if(!this.geojson.length) return this.push(null);
   var self = this
-  this.getNextRow(function (hashes) {
-    self.push(hashes);
+  var hashes = [];
+  async.doUntil(function (callback) {
+    self.getNextRow(function (err, results) {
+      hashes = results;
+      callback(err);
+    });
+  }, function () {
+    return hashes.length || !self.geojson.length;
+  }, function () {
+    if(!self.geojson.length && !hashes.length) return self.push(null);
+    if(self.rowMode) return self.push(hashes);
+    hashes.forEach(function (h) {
+      self.push(h);
+    });
   });
-  
 };
 
 
 /**
  * getNextRow()
  * will get the next row of geohashes for the current index-0 polygon in the list.
+ * only uses the current row bounds for checking pointinpoly
  * rowHash persists so that it is available on the next iteration while the poly is still the same
  */
 Hasher.prototype.getNextRow = function (next) {
-  var self = this,
-    poly = this.geojson[0],
-    rowHashes = [];
+  var self = this;
 
   var makeRow = function () {
 
-    if(!self.rowHash) self.rowHash = geohash.encode(self.bounding[2], self.bounding[1], self.precision);
+    if(!self.rowHash) {
+      self.rowHash = geohash.encode(self.bounding[2], self.bounding[1], self.precision);
+    }
 
     var rowBox = geohash.decode_bbox(self.rowHash),
       columnHash = self.rowHash,
-      columnBox = rowBox,
-      buffer = 0.0002;
+      columnCenter = geohash.decode(columnHash),
+      rowBuffer = 0.0002,
+      rowHashes = [];
 
     clipper = turf.polygon([[
-      [ self.bounding[1] - buffer, rowBox[2] + buffer], // nw
-      [ self.bounding[3] + buffer, rowBox[2] + buffer], // ne
-      [ self.bounding[3] + buffer, rowBox[0] - buffer], // se
-      [ self.bounding[1] - buffer, rowBox[0] - buffer], //sw
-      [ self.bounding[1] - buffer, rowBox[2] + buffer] //nw
+      [ self.bounding[1] - rowBuffer, rowBox[2] + rowBuffer], // nw
+      [ self.bounding[3] + rowBuffer, rowBox[2] + rowBuffer], // ne
+      [ self.bounding[3] + rowBuffer, rowBox[0] - rowBuffer], // se
+      [ self.bounding[1] - rowBuffer, rowBox[0] - rowBuffer], //sw
+      [ self.bounding[1] - rowBuffer, rowBox[2] + rowBuffer] //nw
     ]]);
 
-    turf.intersect(turf.featurecollection([clipper]), turf.featurecollection([poly]), function (err, intersection) {
-      if(!intersection || !intersection.features.length) {
-        next(rowHashes);
-        return
-      }
-      // console.log(JSON.stringify(intersection));
+    turf.intersect(turf.featurecollection([clipper]), turf.featurecollection([self.geojson[0]]), function (err, intersection) {
+      if(intersection && intersection.features.length) {
+        var westerly = geohash.neighbor(geohash.encode(columnCenter.latitude, self.bounding[3], self.precision), [0, 1]);
+        while (columnHash != westerly) {
+          if(inside(columnCenter, intersection)) rowHashes.push(columnHash);
+          columnHash = geohash.neighbor(columnHash, [0, 1]);
+          columnCenter = geohash.decode(columnHash);
+        }
 
-      while (isWest(columnBox[1], self.bounding[3])) {
-        if(inside(geohash.decode(columnHash), intersection)) rowHashes.push(columnHash);
-        columnHash = geohash.neighbor(columnHash, [0, 1]);
-        columnBox = geohash.decode_bbox(columnHash);
-      }
+        self.rowHash = geohash.neighbor(self.rowHash, [-1, 0]);
 
-      // get the hash for the next row.
-      self.rowHash = geohash.neighbor(self.rowHash, [-1, 0]);
-
-      if(rowBox[2] <= self.bounding[0]) {
-        self.geojson.shift();
-        self.rowHash = null;
-        self.bounding = null;
+        if(rowBox[2] <= self.bounding[0]) {
+          self.geojson.shift();
+          self.rowHash = null;
+          self.bounding = null;
+        }
       }
-      // if(rowHashes.length === 0) console.log(JSON.stringify(intersection))
-      next(rowHashes);
+      next(null, rowHashes);
     });
   };
 
   if(!this.bounding) {
-    turf.extent(turf.featurecollection([poly]), function (err, extent) {
-      // [minX, minY, maxX, maxY]
+    turf.extent(turf.featurecollection([this.geojson[0]]), function (err, extent) {
+      // extent = [minX, minY, maxX, maxY], remap to match geohash lib
       self.bounding = [extent[1], extent[0], extent[3], extent[2]];
       makeRow();
     })
@@ -156,59 +145,29 @@ Hasher.prototype.getNextRow = function (next) {
 
 
 /**
+ * intializes the Hasher, but processes the results before returning an array.
+ */
+var polygonHash = module.exports = function (coords, precision, next) {
+  var hasher = streamer(coords, precision, true);
+  var results = [];
+  hasher
+    .on('end', function () {
+      next(null, results)
+    })
+    .pipe(through2.obj(function (arr, enc, callback) {
+      results = results.concat(arr);
+      callback();
+    }));
+};
+
+
+/**
  * initializes the Hasher, as a stream
  */
-module.exports.stream = function (geoJSONCoords, precision, rowMode) {
+var streamer = module.exports.stream = function (coords, precision, rowMode) {
   return new Hasher({
-    geojson: geoJSONCoords,
+    geojson: coords,
     precision: precision,
     rowMode: rowMode ? true : false
   });
 };
-
-
-/**
- * intializes the Hasher, but processes the results before returning an array.
- */
-module.exports.sync = function (geoJSONCoords, precision) {
-  var hasher = new Hasher({
-    geojson: geoJSONCoords,
-    precision: precision
-  });
-  var results = [];
-
-  while(hasher.geojson.length) {
-    results = results.concat(hasher.getNextRow());
-  }
-
-  return results;
-};
-
-
-/**
- * Convert polygon to bounding box
- * accepts polygon in geojson format (not multipoly): [[[lon, lat]]]
- * returns [minLat, minLon, maxLat, maxLon]
- */
-var polyToBB = function (polygon) {
-  var minLat = Number.MAX_VALUE, minLon = minLat, maxLat = -minLat, maxLon = -minLat;
-  for (var a = 0; a < polygon.length; a++) {
-    for (var b = 0; b < polygon[a].length; b++) {
-      var p = polygon[a][b];
-      minLat = Math.min(minLat, p[1]);
-      minLon = Math.min(minLon, p[0]);
-      maxLat = Math.max(maxLat, p[1]);
-      maxLon = Math.max(maxLon, p[0]);
-    }
-  }
-  return [minLat, minLon, maxLat, maxLon];
-}
-
-
-/**
- * determine if lon1 is west of lon2
- * returns boolean
- **/
-var isWest = function (lon1, lon2) {
-  return (lon1 < lon2 && lon2 - lon1 < 180) || (lon1 > lon2 && lon2 - lon1 + 360 < 180);
-}

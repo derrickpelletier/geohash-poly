@@ -17,9 +17,8 @@
   "dependencies": {
     "ngeohash": "~0.2.0",
     "point-in-polygon": "0.0.0",
-    "turf": "0.0.119"
-  },
-  "devDependencies": {
+    "turf": "0.0.119",
+    "async": "~0.2.10",
     "through2": "~0.4.0"
   }
 }
