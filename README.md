@@ -60,8 +60,8 @@ These are just from running my machine, running the streaming example in rowMode
 
 ### v0.2.1
 + Modifications: only performs an intersection on the poly if there are > n points in the polygon. 
-+ Runtime: 745.36s
++ Runtime: 84.20s
 
 ### v0.2.0
-+ Split the operating polygon to only utilize it's current row, defined by bounding box E/W and geohash N/S.
-+ Runtime:
++ Split the operating polygon to only utilize its current row, defined by bounding box E/W and geohash N/S.
++ Runtime: 83.01s

@@ -35,7 +35,7 @@ var Hasher = function (options) {
     precision: 6,
     rowMode: false,
     geojson: [],
-    splitAt: 30000
+    splitAt: 2000
   }
   options = options || {};
   for (var attrname in defaults) {
@@ -107,6 +107,7 @@ Hasher.prototype.getNextRow = function (done) {
 
     var preparePoly = function (next) {
       // Detect poly length
+
       if(self.geojson[0].geometry.coordinates[0].length >= self.splitAt) {
 
         clipper = turf.polygon([[
@@ -119,9 +120,10 @@ Hasher.prototype.getNextRow = function (done) {
         
         turf.intersect(turf.featurecollection([clipper]), turf.featurecollection([self.geojson[0]]), function (err, intersection) {
           var prepare = null;
-          console.log(intersection.features[0])
           if(intersection && intersection.features.length) {
             next(null, intersection.features[0]);
+          } else {
+            next(null, self.geojson[0].geometry);
           }
         });
 
@@ -135,7 +137,7 @@ Hasher.prototype.getNextRow = function (done) {
       var westerly = geohash.neighbor(geohash.encode(columnCenter.latitude, self.bounding[3], self.precision), [0, 1]);
       while (columnHash != westerly) {
         
-        if(inside(columnCenter, self.geojson[0].geometry)) rowHashes.push(columnHash);
+        if(inside(columnCenter, prepared)) rowHashes.push(columnHash);
         // if(inside(columnCenter, intersection)) rowHashes.push(columnHash);
         columnHash = geohash.neighbor(columnHash, [0, 1]);
         columnCenter = geohash.decode(columnHash);
