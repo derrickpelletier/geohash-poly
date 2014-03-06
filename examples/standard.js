@@ -4,5 +4,5 @@ var small = [[[-122.350051, 47.702893 ], [-122.344774, 47.702877 ], [-122.344777
 
 hasher(small, 7, function (err, hashes) {
 	console.log(hashes.length);
-	console.log(hashes);	
+	console.log(hashes);
 });
