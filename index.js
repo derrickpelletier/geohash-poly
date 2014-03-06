@@ -8,9 +8,8 @@ var Readable = require('stream').Readable,
 /**
  * utilizing point-in-poly but providing support for geojson polys and holes.
  */
-var inside = function (point, features) {
-  var geopoly = features.features[0],
-    inside = 0;
+var inside = function (point, geopoly) {
+  var inside = 0;
   
   if(geopoly.type !== "Polygon" && geopoly.type !== "MultiPolygon") return false;
   
@@ -35,7 +34,8 @@ var Hasher = function (options) {
   var defaults = {
     precision: 6,
     rowMode: false,
-    geojson: []
+    geojson: [],
+    splitAt: 30000
   }
   options = options || {};
   for (var attrname in defaults) {
@@ -87,8 +87,10 @@ Hasher.prototype._read = function (size) {
  * only uses the current row bounds for checking pointinpoly
  * rowHash persists so that it is available on the next iteration while the poly is still the same
  */
-Hasher.prototype.getNextRow = function (next) {
+Hasher.prototype.getNextRow = function (done) {
   var self = this;
+
+
 
   var makeRow = function () {
 
@@ -102,32 +104,52 @@ Hasher.prototype.getNextRow = function (next) {
       rowBuffer = 0.0002,
       rowHashes = [];
 
-    clipper = turf.polygon([[
-      [ self.bounding[1] - rowBuffer, rowBox[2] + rowBuffer], // nw
-      [ self.bounding[3] + rowBuffer, rowBox[2] + rowBuffer], // ne
-      [ self.bounding[3] + rowBuffer, rowBox[0] - rowBuffer], // se
-      [ self.bounding[1] - rowBuffer, rowBox[0] - rowBuffer], //sw
-      [ self.bounding[1] - rowBuffer, rowBox[2] + rowBuffer] //nw
-    ]]);
 
-    turf.intersect(turf.featurecollection([clipper]), turf.featurecollection([self.geojson[0]]), function (err, intersection) {
-      if(intersection && intersection.features.length) {
-        var westerly = geohash.neighbor(geohash.encode(columnCenter.latitude, self.bounding[3], self.precision), [0, 1]);
-        while (columnHash != westerly) {
-          if(inside(columnCenter, intersection)) rowHashes.push(columnHash);
-          columnHash = geohash.neighbor(columnHash, [0, 1]);
-          columnCenter = geohash.decode(columnHash);
-        }
+    var preparePoly = function (next) {
+      // Detect poly length
+      if(self.geojson[0].geometry.coordinates[0].length >= self.splitAt) {
 
-        self.rowHash = geohash.neighbor(self.rowHash, [-1, 0]);
+        clipper = turf.polygon([[
+          [ self.bounding[1] - rowBuffer, rowBox[2] + rowBuffer], // nw
+          [ self.bounding[3] + rowBuffer, rowBox[2] + rowBuffer], // ne
+          [ self.bounding[3] + rowBuffer, rowBox[0] - rowBuffer], // se
+          [ self.bounding[1] - rowBuffer, rowBox[0] - rowBuffer], //sw
+          [ self.bounding[1] - rowBuffer, rowBox[2] + rowBuffer] //nw
+        ]]);
+        
+        turf.intersect(turf.featurecollection([clipper]), turf.featurecollection([self.geojson[0]]), function (err, intersection) {
+          var prepare = null;
+          console.log(intersection.features[0])
+          if(intersection && intersection.features.length) {
+            next(null, intersection.features[0]);
+          }
+        });
 
-        if(rowBox[2] <= self.bounding[0]) {
-          self.geojson.shift();
-          self.rowHash = null;
-          self.bounding = null;
-        }
+      } else {
+          next(null, self.geojson[0].geometry);
       }
-      next(null, rowHashes);
+    }
+
+
+    preparePoly(function (err, prepared) {
+      var westerly = geohash.neighbor(geohash.encode(columnCenter.latitude, self.bounding[3], self.precision), [0, 1]);
+      while (columnHash != westerly) {
+        
+        if(inside(columnCenter, self.geojson[0].geometry)) rowHashes.push(columnHash);
+        // if(inside(columnCenter, intersection)) rowHashes.push(columnHash);
+        columnHash = geohash.neighbor(columnHash, [0, 1]);
+        columnCenter = geohash.decode(columnHash);
+      }
+
+      self.rowHash = geohash.neighbor(self.rowHash, [-1, 0]);
+
+      if(rowBox[2] <= self.bounding[0]) {
+        self.geojson.shift();
+        self.rowHash = null;
+        self.bounding = null;
+      }
+      done(null, rowHashes);
+
     });
   };
 

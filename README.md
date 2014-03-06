@@ -51,3 +51,17 @@ Results in:
 ```
 [ 'c22zrgg', 'c22zrgu', 'c22zrgv', 'c22zrgy', 'c22zrgz', 'c23p25b', 'c22zrge', 'c22zrgs', 'c22zrgt', 'c22zrgw', 'c22zrgx', 'c23p258', 'c23p259', 'c23p25d', 'c22zrg7', 'c22zrgk', 'c22zrgm', 'c22zrgq', 'c22zrgr', 'c23p252', 'c23p253', 'c23p256', 'c22zrg5', 'c22zrgh', 'c22zrgj', 'c22zrgn', 'c22zrgp', 'c23p250', 'c23p251', 'c23p254' ]
 ```
+
+
+----------
+## Completely unscientific benchmarks
+
+These are just from running my machine, running the streaming example in rowMode.
+
+### v0.2.1
++ Modifications: only performs an intersection on the poly if there are > n points in the polygon. 
++ Runtime: 745.36s
+
+### v0.2.0
++ Split the operating polygon to only utilize it's current row, defined by bounding box E/W and geohash N/S.
++ Runtime:
