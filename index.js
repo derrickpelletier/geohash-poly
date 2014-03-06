@@ -36,7 +36,7 @@ var Hasher = function (options) {
     rowMode: false,
     geojson: [],
     splitAt: 2000
-  }
+  };
   options = options || {};
   for (var attrname in defaults) {
     this[attrname] = options.hasOwnProperty(attrname) && (options[attrname] !== null && typeof options[attrname] !== 'undefined') ? options[attrname] : defaults[attrname];
@@ -51,7 +51,7 @@ var Hasher = function (options) {
   Readable.call(this, {
     objectMode: this.rowMode
   });
-}
+};
 require('util').inherits(Hasher, Readable);
 
 
@@ -62,7 +62,7 @@ require('util').inherits(Hasher, Readable);
  * if there are no polygons remaining in the geojson, push null to end stream
  */
 Hasher.prototype._read = function (size) {
-  var self = this
+  var self = this;
   var hashes = [];
   async.doUntil(function (callback) {
     self.getNextRow(function (err, results) {
@@ -130,7 +130,7 @@ Hasher.prototype.getNextRow = function (done) {
       } else {
           next(null, self.geojson[0].geometry);
       }
-    }
+    };
 
 
     preparePoly(function (err, prepared) {
@@ -160,7 +160,7 @@ Hasher.prototype.getNextRow = function (done) {
       // extent = [minX, minY, maxX, maxY], remap to match geohash lib
       self.bounding = [extent[1], extent[0], extent[3], extent[2]];
       makeRow();
-    })
+    });
   } else {
     makeRow();
   }
@@ -176,7 +176,7 @@ var polygonHash = module.exports = function (coords, precision, next) {
   var results = [];
   hasher
     .on('end', function () {
-      next(null, results)
+      next(null, results);
     })
     .pipe(through2.obj(function (arr, enc, callback) {
       results = results.concat(arr);
