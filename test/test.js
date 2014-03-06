@@ -3,50 +3,52 @@ var hasher = require('../index'),
   ldj = require('ldjson-stream'),
   fs = require('fs'),
   through2 = require('through2'),
-  polys = [];
-
-before(function (done) {
-  fs.createReadStream('test/geojsons.ldj')
-    .pipe(ldj.parse())
-    .on('data', function(obj) {
-      polys.push(obj);
-    })
-    .on('end', done);
-});
+  geojsonsFile = 'test/geojsons.ldj';
 
 describe('geohash-poly', function () {
 
   describe('standard', function () {
 
-    it('should return the expected number of geohashes.', function (done) {
-      hasher(polys[0].coordinates, 7, function (err, hashes) {
-        should.not.exist(err);
-        hashes.length.should.equal(polys[0].expected);
-        done();
-      });
+    it('should return the expected number of geohashes for shapes.', function (done) {
+      fs.createReadStream(geojsonsFile)
+        .pipe(ldj.parse())
+        .on('data', function(geojson) {
+          var self = this;
+          self.pause();
+          hasher(geojson.geometry.coordinates, geojson.precision, function (err, hashes) {
+            should.not.exist(err);
+            hashes.length.should.equal(geojson.expected);
+            self.resume();
+          });
+        })
+        .on('end', done);
     });
-
   });
 
   describe('streaming', function () {
 
-    it('should return the expected number of geohashes and rows.', function (done) {
-      var rowStream = hasher.stream(polys[0].coordinates, 7, true),
-        hashCount = 0,
-        rowCount = 0;
-      rowStream
-        .on('end', function () {
-          hashCount.should.equal(polys[0].expected);
-          rowCount.should.equal(polys[0].rows);
-          done();
+    it('should return the expected number of geohashes and rows for shapes.', function (done) {
+      fs.createReadStream(geojsonsFile)
+        .pipe(ldj.parse())
+        .on('data', function(geojson) {
+          var self = this;
+          self.pause();
+          var rowStream = hasher.stream(geojson.geometry.coordinates, geojson.precision, true),
+            hashCount = 0,
+            rowCount = 0;
+          rowStream
+            .on('end', function () {
+              hashCount.should.equal(geojson.expected);
+              rowCount.should.equal(geojson.rows);
+              self.resume();
+            })
+            .pipe(through2.obj(function (hashes, enc, callback) {
+              hashCount += hashes.length;
+              rowCount += 1;
+              callback();
+            }));
         })
-        .pipe(through2.obj(function (hashes, enc, callback) {
-          hashCount += hashes.length;
-          rowCount += 1;
-          callback();
-        }));
+        .on('end', done);
     });
-
   });
-
 });
