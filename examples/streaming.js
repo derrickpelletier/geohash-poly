@@ -1,5 +1,5 @@
 var hasher = require('../index'),
-	async = require('async'),
+  async = require('async'),
   through2 = require('through2');
 
 // Regular small poly
@@ -15,19 +15,19 @@ var difficult = [[[ -0.192859999858964, 51.60698718135948 ], [ -0.19136798800482
 
 async.mapSeries([small, difficult, massive], function (poly, cb) {
 
-	var rowStream = hasher.stream(poly, 7, true),
-	  a = 0;
+  var rowStream = hasher.stream(poly, 7, true),
+    a = 0;
 
-	rowStream
-	  .on('end', cb)
-	  .pipe(through2.obj(function (arr, enc, callback) {
-	    a += arr.length;
-	    console.log("In row: ", arr.length);
-	    callback();
-	  }));
+  rowStream
+    .on('end', cb)
+    .pipe(through2.obj(function (arr, enc, callback) {
+      a += arr.length;
+      console.log("In row: ", arr.length);
+      callback();
+    }));
 }, function () {
-	console.log("Au revior.");
-})
+  console.log("Au revior.");
+});
 
 
 
