@@ -83,12 +83,13 @@ Hasher.prototype._read = function (size) {
 
 /**
  * getNextRow()
- * will get the next row of geohashes for the current index-0 polygon in the list.
+ * will get the next row of geohashes for the current length-1 polygon in the list.
  * only uses the current row bounds for checking pointinpoly
  * rowHash persists so that it is available on the next iteration while the poly is still the same
  */
 Hasher.prototype.getNextRow = function (done) {
-  var self = this;
+  var self = this,
+    currentGeojson = self.geojson[self.geojson.length-1];
 
   var makeRow = function () {
 
@@ -105,7 +106,7 @@ Hasher.prototype.getNextRow = function (done) {
     var preparePoly = function (next) {
       // Detect poly length
 
-      if(self.geojson[0].geometry.coordinates[0].length >= self.splitAt) {
+      if(currentGeojson.geometry.coordinates[0].length >= self.splitAt) {
 
         clipper = turf.polygon([[
           [ self.bounding[1] - rowBuffer, rowBox[2] + rowBuffer], // nw
@@ -115,17 +116,17 @@ Hasher.prototype.getNextRow = function (done) {
           [ self.bounding[1] - rowBuffer, rowBox[2] + rowBuffer] //nw
         ]]);
         
-        turf.intersect(turf.featurecollection([clipper]), turf.featurecollection([self.geojson[0]]), function (err, intersection) {
+        turf.intersect(turf.featurecollection([clipper]), turf.featurecollection([currentGeojson]), function (err, intersection) {
           var prepare = null;
           if(intersection && intersection.features.length) {
             next(null, intersection.features[0]);
           } else {
-            next(null, self.geojson[0].geometry);
+            next(null, currentGeojson.geometry);
           }
         });
 
       } else {
-          next(null, self.geojson[0].geometry);
+          next(null, currentGeojson.geometry);
       }
     };
 
@@ -144,7 +145,7 @@ Hasher.prototype.getNextRow = function (done) {
       // Check if the current rowHash was already the most southerly hash on the map.
       // Also check if we are at or past the bottom of the bounding box.
       if(southNeighbour === self.rowHash || rowBox[0] <= self.bounding[0]) {
-        self.geojson.shift();
+        self.geojson.pop();
         self.rowHash = null;
         self.bounding = null;
       } else {
@@ -156,7 +157,7 @@ Hasher.prototype.getNextRow = function (done) {
   };
 
   if(!this.bounding) {
-    turf.extent(turf.featurecollection([this.geojson[0]]), function (err, extent) {
+    turf.extent(turf.featurecollection([currentGeojson]), function (err, extent) {
       // extent = [minX, minY, maxX, maxY], remap to match geohash lib
       self.bounding = [extent[1], extent[0], extent[3], extent[2]];
       makeRow();
