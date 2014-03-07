@@ -66,7 +66,7 @@ Hasher.prototype._read = function (size) {
   var hashes = [];
   async.doUntil(function (callback) {
     self.getNextRow(function (err, results) {
-      hashes = results;
+      hashes = results || [];
       callback(err);
     });
   }, function () {
@@ -90,7 +90,8 @@ Hasher.prototype._read = function (size) {
 Hasher.prototype.getNextRow = function (done) {
   var self = this;
 
-
+  // No more geojsons to check means there are no more hashes - we're done here
+  if(!self.geojson.length) return done();
 
   var makeRow = function () {
 
@@ -103,6 +104,14 @@ Hasher.prototype.getNextRow = function (done) {
       columnCenter = geohash.decode(columnHash),
       rowBuffer = 0.0002,
       rowHashes = [];
+
+    // Make sure the row is within the bounding box
+    if(rowBox[2] <= self.bounding[0]) {
+      self.geojson.shift();
+      self.rowHash = null;
+      self.bounding = null;
+      return done(null, rowHashes);
+    }
 
 
     var preparePoly = function (next) {
@@ -138,17 +147,19 @@ Hasher.prototype.getNextRow = function (done) {
       while (columnHash != westerly) {
         
         if(inside(columnCenter, prepared)) rowHashes.push(columnHash);
-        // if(inside(columnCenter, intersection)) rowHashes.push(columnHash);
         columnHash = geohash.neighbor(columnHash, [0, 1]);
         columnCenter = geohash.decode(columnHash);
       }
 
-      self.rowHash = geohash.neighbor(self.rowHash, [-1, 0]);
+      var southNeighbour = geohash.neighbor(self.rowHash, [-1, 0]);
 
-      if(rowBox[2] <= self.bounding[0]) {
+      // Check if the current rowHash was already the most southerly hash on the map.
+      if(southNeighbour === self.rowHash) {
         self.geojson.shift();
         self.rowHash = null;
         self.bounding = null;
+      } else {
+        self.rowHash = southNeighbour;
       }
       done(null, rowHashes);
 
