@@ -64,13 +64,13 @@ require('util').inherits(Hasher, Readable);
 Hasher.prototype._read = function (size) {
   var self = this;
   var hashes = [];
-  async.doUntil(function (callback) {
+  async.whilst(function () {
+    return !hashes.length && self.geojson.length;
+  }, function (callback) {
     self.getNextRow(function (err, results) {
       hashes = results || [];
       callback(err);
     });
-  }, function () {
-    return hashes.length || !self.geojson.length;
   }, function () {
     if(!self.geojson.length && !hashes.length) return self.push(null);
     if(self.rowMode) return self.push(hashes);
@@ -90,9 +90,6 @@ Hasher.prototype._read = function (size) {
 Hasher.prototype.getNextRow = function (done) {
   var self = this;
 
-  // No more geojsons to check means there are no more hashes - we're done here
-  if(!self.geojson.length) return done();
-
   var makeRow = function () {
 
     if(!self.rowHash) {
@@ -104,15 +101,6 @@ Hasher.prototype.getNextRow = function (done) {
       columnCenter = geohash.decode(columnHash),
       rowBuffer = 0.0002,
       rowHashes = [];
-
-    // Make sure the row is within the bounding box
-    if(rowBox[2] <= self.bounding[0]) {
-      self.geojson.shift();
-      self.rowHash = null;
-      self.bounding = null;
-      return done(null, rowHashes);
-    }
-
 
     var preparePoly = function (next) {
       // Detect poly length
@@ -154,7 +142,8 @@ Hasher.prototype.getNextRow = function (done) {
       var southNeighbour = geohash.neighbor(self.rowHash, [-1, 0]);
 
       // Check if the current rowHash was already the most southerly hash on the map.
-      if(southNeighbour === self.rowHash) {
+      // Also check if we are at or past the bottom of the bounding box.
+      if(southNeighbour === self.rowHash || rowBox[0] <= self.bounding[0]) {
         self.geojson.shift();
         self.rowHash = null;
         self.bounding = null;
