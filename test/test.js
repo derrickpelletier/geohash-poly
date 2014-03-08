@@ -35,7 +35,7 @@ require('joe').describe('geohash-poly', function (describe, it) {
       .on('data', function(geojson) {
         var self = this;
 
-        it('should return the expected number of geohashes and rows for shapes.', function (done) {
+        it('should return the expected number of geohashes and rows for ' + geojson.comment + ' shape.', function (done) {
           self.pause();
           var rowStream = hasher.stream(geojson.geometry.coordinates, geojson.precision, true),
             hashCount = 0,
