@@ -99,13 +99,11 @@ Hasher.prototype.getNextRow = function (done) {
 
     var rowBox = geohash.decode_bbox(self.rowHash),
       columnHash = self.rowHash,
-      columnCenter = geohash.decode(columnHash),
       rowBuffer = 0.0002,
       rowHashes = [];
 
     var preparePoly = function (next) {
       // Detect poly length
-
       if(currentGeojson.geometry.coordinates[0].length >= self.splitAt) {
 
         clipper = turf.polygon([[
@@ -119,7 +117,16 @@ Hasher.prototype.getNextRow = function (done) {
         turf.intersect(turf.featurecollection([clipper]), turf.featurecollection([currentGeojson]), function (err, intersection) {
           var prepare = null;
           if(intersection && intersection.features.length) {
-            next(null, intersection.features[0]);
+
+            // Calculate the row bounding and column hash based on the intersection
+            var intersectionFeature = { type: 'Feature', geometry: intersection.features[0], properties: {} };
+            turf.extent(turf.featurecollection([intersectionFeature]), function (err, extent) {
+              // extent = [minX, minY, maxX, maxY], remap to match geohash lib
+              self.rowBounding = [extent[1], extent[0], extent[3], extent[2]];
+              var midY = self.rowBounding[0]+(self.rowBounding[2]-self.rowBounding[0])/2;
+              columnHash = geohash.encode(midY, self.rowBounding[1], self.precision);
+              next(err, intersection.features[0]);
+            });
           } else {
             next(null, currentGeojson.geometry);
           }
@@ -132,7 +139,8 @@ Hasher.prototype.getNextRow = function (done) {
 
 
     preparePoly(function (err, prepared) {
-      var westerly = geohash.neighbor(geohash.encode(columnCenter.latitude, self.bounding[3], self.precision), [0, 1]);
+      var columnCenter = geohash.decode(columnHash),
+        westerly = geohash.neighbor(geohash.encode(columnCenter.latitude, self.rowBounding[3], self.precision), [0, 1]);
       while (columnHash != westerly) {
         
         if(inside(columnCenter, prepared)) rowHashes.push(columnHash);
@@ -148,6 +156,7 @@ Hasher.prototype.getNextRow = function (done) {
         self.geojson.pop();
         self.rowHash = null;
         self.bounding = null;
+        self.rowBounding = null;
       } else {
         self.rowHash = southNeighbour;
       }
@@ -160,6 +169,7 @@ Hasher.prototype.getNextRow = function (done) {
     turf.extent(turf.featurecollection([currentGeojson]), function (err, extent) {
       // extent = [minX, minY, maxX, maxY], remap to match geohash lib
       self.bounding = [extent[1], extent[0], extent[3], extent[2]];
+      self.rowBounding = self.bounding.slice(0);
       makeRow();
     });
   } else {
