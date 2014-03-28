@@ -68,4 +68,4 @@ Results in:
 The `hashMode` option can be used to specify which hashes to return. Defaults to `'inside'`.
 
 - `'inside'`: return hashes whose center points fall inside the shape.
-- `'all'`: return all hashes which make up the extent of the shape.
+- `'extent'`: return all hashes which make up the bounding box of the shape.

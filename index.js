@@ -105,7 +105,7 @@ Hasher.prototype.getNextRow = function (done) {
 
     var preparePoly = function (next) {
       // Detect poly length
-      if(currentGeojson.geometry.coordinates[0].length >= self.splitAt) {
+      if(self.hashMode !== 'extent' && currentGeojson.geometry.coordinates[0].length >= self.splitAt) {
 
         clipper = turf.polygon([[
           [ self.bounding[1] - rowBuffer, rowBox[2] + rowBuffer], // nw
