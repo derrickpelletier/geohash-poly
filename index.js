@@ -35,7 +35,8 @@ var Hasher = function (options) {
     precision: 6,
     rowMode: false,
     geojson: [],
-    splitAt: 2000
+    splitAt: 2000,
+    hashMode: 'inside'
   };
   options = options || {};
   for (var attrname in defaults) {
@@ -104,7 +105,7 @@ Hasher.prototype.getNextRow = function (done) {
 
     var preparePoly = function (next) {
       // Detect poly length
-      if(currentGeojson.geometry.coordinates[0].length >= self.splitAt) {
+      if(self.hashMode !== 'extent' && currentGeojson.geometry.coordinates[0].length >= self.splitAt) {
 
         clipper = turf.polygon([[
           [ self.bounding[1] - rowBuffer, rowBox[2] + rowBuffer], // nw
@@ -142,8 +143,7 @@ Hasher.prototype.getNextRow = function (done) {
       var columnCenter = geohash.decode(columnHash),
         westerly = geohash.neighbor(geohash.encode(columnCenter.latitude, self.rowBounding[3], self.precision), [0, 1]);
       while (columnHash != westerly) {
-        
-        if(inside(columnCenter, prepared)) rowHashes.push(columnHash);
+        if(self.hashMode !== 'inside' || inside(columnCenter, prepared)) rowHashes.push(columnHash);
         columnHash = geohash.neighbor(columnHash, [0, 1]);
         columnCenter = geohash.decode(columnHash);
       }
@@ -182,8 +182,9 @@ Hasher.prototype.getNextRow = function (done) {
 /**
  * intializes the Hasher, but processes the results before returning an array.
  */
-var polygonHash = module.exports = function (coords, precision, next) {
-  var hasher = streamer(coords, precision, true);
+var polygonHash = module.exports = function (options, next) {
+  options.rowMode = true;
+  var hasher = streamer(options);
   var results = [];
   hasher
     .on('end', function () {
@@ -199,10 +200,12 @@ var polygonHash = module.exports = function (coords, precision, next) {
 /**
  * initializes the Hasher, as a stream
  */
-var streamer = module.exports.stream = function (coords, precision, rowMode) {
+// var streamer = module.exports.stream = function (coords, precision, rowMode, hashMode) {
+var streamer = module.exports.stream = function (options) {
   return new Hasher({
-    geojson: coords,
-    precision: precision,
-    rowMode: rowMode ? true : false
+    geojson: options.coords,
+    precision: options.precision,
+    rowMode: options.rowMode ? true : false,
+    hashMode: options.hashMode
   });
 };

@@ -18,10 +18,23 @@ require('joe').describe('geohash-poly', function (describe, it) {
 
         async.timesSeries(geojson.properties.maxPrecision, function (n, next) {
           var precision = n + 1;
+          var options = {
+            coords: geojson.geometry.coordinates,
+            precision: precision,
+            hashMode: 'inside'
+          };
           it('should geohash ' + geojson.properties.comment + ' shape. Precision ' + precision + '.', function (done) {
-            hasher(geojson.geometry.coordinates, precision, function (err, hashes) {
+            hasher(options, function (err, hashes) {
               should.not.exist(err);
-              hashes.length.should.equal(geojson.properties.expected[n]);
+              hashes.length.should.equal(geojson.properties.expectedInside[n]);
+              done();
+            });
+          });
+          it('should geohash ' + geojson.properties.comment + ' shape. Precision ' + precision + '. hashMode "extent".', function (done) {
+            options.hashMode = 'extent';
+            hasher(options, function (err, hashes) {
+              should.not.exist(err);
+              hashes.length.should.equal(geojson.properties.expectedExtent[n]);
               done();
             });
           });
@@ -41,17 +54,39 @@ require('joe').describe('geohash-poly', function (describe, it) {
       .on('data', function(geojson) {
         var self = this;
         self.pause();
-
         async.timesSeries(geojson.properties.maxPrecision, function (n, next) {
           var precision = n + 1;
+          var options = {
+            coords: geojson.geometry.coordinates,
+            precision: precision,
+            hashMode: 'inside',
+            rowMode: true
+          };
           it('should geohash ' + geojson.properties.comment + ' shape. Precision ' + precision + '.', function (done) {
-            var rowStream = hasher.stream(geojson.geometry.coordinates, precision, true),
+            var rowStream = hasher.stream(options),
               hashCount = 0,
               rowCount = 0;
             rowStream
               .on('end', function () {
-                hashCount.should.equal(geojson.properties.expected[n]);
-                rowCount.should.equal(geojson.properties.rows[n]);
+                hashCount.should.equal(geojson.properties.expectedInside[n]);
+                rowCount.should.equal(geojson.properties.rowsInside[n]);
+                done();
+              })
+              .pipe(through2.obj(function (hashes, enc, callback) {
+                hashCount += hashes.length;
+                rowCount += 1;
+                callback();
+              }));
+          });
+          it('should geohash ' + geojson.properties.comment + ' shape. Precision ' + precision + '. hashMode "extent".', function (done) {
+            options.hashMode = 'extent';
+            var rowStream = hasher.stream(options),
+              hashCount = 0,
+              rowCount = 0;
+            rowStream
+              .on('end', function () {
+                hashCount.should.equal(geojson.properties.expectedExtent[n]);
+                rowCount.should.equal(geojson.properties.rowsExtent[n]);
                 done();
               })
               .pipe(through2.obj(function (hashes, enc, callback) {

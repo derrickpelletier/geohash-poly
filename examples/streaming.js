@@ -15,7 +15,14 @@ var difficult = [[[ -0.192859999858964, 51.60698718135948 ], [ -0.19136798800482
 
 async.mapSeries([small, difficult, massive], function (poly, cb) {
 
-  var rowStream = hasher.stream(poly, 7, true),
+  var options = {
+    coords: poly,
+    precision: 7,
+    rowMode: true,
+    hashMode: 'inside'
+  };
+
+  var rowStream = hasher.stream(options),
     a = 0;
 
   rowStream
