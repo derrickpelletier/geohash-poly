@@ -3,7 +3,8 @@ var Readable = require('stream').Readable,
   pip = require('point-in-polygon'),
   turf = require('turf'),
   through2 = require('through2'),
-  async = require('async');
+  async = require('async'),
+  geojsonArea = require('geojson-area');
 
 /**
  * utilizing point-in-poly but providing support for geojson polys and holes.
@@ -36,7 +37,8 @@ var Hasher = function (options) {
     rowMode: false,
     geojson: [],
     splitAt: 2000,
-    hashMode: 'inside'
+    hashMode: 'inside',
+    threshold: 0
   };
   options = options || {};
   for (var attrname in defaults) {
@@ -143,7 +145,11 @@ Hasher.prototype.getNextRow = function (done) {
       var columnCenter = geohash.decode(columnHash),
         westerly = geohash.neighbor(geohash.encode(columnCenter.latitude, self.rowBounding[3], self.precision), [0, 1]);
       while (columnHash != westerly) {
-        if(self.hashMode !== 'inside' || inside(columnCenter, prepared)) rowHashes.push(columnHash);
+        if(self.hashMode === 'inside' && inside(columnCenter, prepared)) {
+          rowHashes.push(columnHash);
+        } else if (self.hashMode === 'intersect' || self.hashMode === 'extent') {
+          rowHashes.push(columnHash);
+        }
         columnHash = geohash.neighbor(columnHash, [0, 1]);
         columnCenter = geohash.decode(columnHash);
       }
@@ -160,7 +166,36 @@ Hasher.prototype.getNextRow = function (done) {
       } else {
         self.rowHash = southNeighbour;
       }
-      done(null, rowHashes);
+
+      if(self.hashMode === 'inside' || self.hashMode === 'extent' || !rowHashes.length) {
+        done(null, rowHashes);
+      } else if (self.hashMode === 'intersect') {
+
+        var baseArea = null;
+        async.filter(rowHashes, function (h, cb) {
+          var bb = geohash.decode_bbox(h);
+          bb = turf.polygon([[
+                [bb[1], bb[2]],
+                [bb[3], bb[2]],
+                [bb[3], bb[0]],
+                [bb[1], bb[0]],
+                [bb[1], bb[2]]
+              ]]);
+
+          if(!baseArea) baseArea = geojsonArea.geometry(bb.geometry);
+
+          turf.intersect(turf.featurecollection([turf.polygon(prepared.coordinates)]), turf.featurecollection([bb]), function (err, intersected) {
+            var keepIntersection = !self.threshold ? true : false;
+            if(self.threshold && intersected.features.length && (intersected.features[0].type === 'Polygon' || intersected.features[0].type === 'MultiPolygon')) {
+              var intersectedArea = geojsonArea.geometry(intersected.features[0]);
+              keepIntersection = baseArea && intersectedArea / baseArea >= self.threshold;
+            }
+            cb(keepIntersection);
+          });
+        }, function (results) {
+          done(null, results);
+        });
+      }
 
     });
   };
@@ -206,6 +241,7 @@ var streamer = module.exports.stream = function (options) {
     geojson: options.coords,
     precision: options.precision,
     rowMode: options.rowMode ? true : false,
-    hashMode: options.hashMode
+    hashMode: options.hashMode,
+    threshold: options.threshold
   });
 };
