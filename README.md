@@ -69,3 +69,4 @@ The `hashMode` option can be used to specify which hashes to return. Defaults to
 
 - `'inside'`: return hashes whose center points fall inside the shape.
 - `'extent'`: return all hashes which make up the bounding box of the shape.
+- `'intersect'`: return all hashes that intersect with the shape. Use the `'threshold'` option to specify a percentage of least coverage. See `examples/streaming.js`.
