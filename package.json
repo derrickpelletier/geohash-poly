@@ -1,6 +1,6 @@
 {
   "name": "geohash-poly",
-  "version": "0.4.0",
+  "version": "0.4.1",
   "description": "Transform a GeoJSON Polygon or MultiPolygon to a list of geohashes that form it.",
   "main": "index.js",
   "bin": "./bin/cli.js",
