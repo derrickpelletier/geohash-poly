@@ -3,6 +3,7 @@
   "version": "0.4.0",
   "description": "Transform a GeoJSON Polygon or MultiPolygon to a list of geohashes that form it.",
   "main": "index.js",
+  "bin": "./bin/cli.js",
   "repository": {
     "type": "git",
     "url": "http://github.com/derrickpelletier/geohash-poly.git"
@@ -15,12 +16,13 @@
   "license": "MIT",
   "readmeFilename": "README.md",
   "dependencies": {
+    "async": "~0.2.10",
+    "geojson-area": "^0.1.0",
     "ngeohash": "~0.2.0",
     "point-in-polygon": "0.0.0",
-    "turf": "0.0.119",
-    "async": "~0.2.10",
+    "rc": "^0.6.0",
     "through2": "~0.4.0",
-    "geojson-area": "^0.1.0"
+    "turf": "0.0.119"
   },
   "devDependencies": {
     "should": "~3.1.3",
