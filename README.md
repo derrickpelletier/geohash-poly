@@ -19,8 +19,8 @@ var through2 = require('through2');
 var polygon = [[[-122.350051, 47.702893 ], [-122.344774, 47.702877 ], [-122.344777, 47.70324 ], [-122.341982, 47.703234 ], [-122.341959, 47.701421 ], [-122.339749, 47.701416 ], [-122.339704, 47.69776 ], [-122.341913, 47.697797 ], [-122.341905, 47.697071 ], [-122.344576, 47.697084 ], [-122.344609, 47.697807 ], [-122.349999, 47.697822 ], [-122.350051, 47.702893 ]]];
 
 var stream = geohashpoly.stream({
-	coords: polygon, 
-	precision: 7, 
+	coords: polygon,
+	precision: 7,
 	rowMode: true
 });
 
@@ -70,3 +70,27 @@ The `hashMode` option can be used to specify which hashes to return. Defaults to
 - `'inside'`: return hashes whose center points fall inside the shape.
 - `'extent'`: return all hashes which make up the bounding box of the shape.
 - `'intersect'`: return all hashes that intersect with the shape. Use the `'threshold'` option to specify a percentage of least coverage. See `examples/streaming.js`.
+
+# Command Line
+
+You can also install as a command line util via
+
+`npm install geohash-poly -g`
+
+## command line usage
+
+Here are some examples of running it:
+
+```bash
+geohash-poly --csv=true --precision=9 --geocode=true  "[[[-122.350051, 47.702893 ], [-122.344774, 47.702877 ], [-122.344777, 47.70324 ], [-122.341982, 47.703234 ], [-122.341959, 47.701421 ], [-122.339749, 47.701416 ], [-122.339704, 47.69776 ], [-122.341913, 47.697797 ], [-122.341905, 47.697071 ], [-122.344576, 47.697084 ], [-122.344609, 47.697807 ], [-122.349999, 47.697822 ], [-122.350051, 47.702893 ]]]"
+```
+
+Where additional command line switches are
+
+ - --csv=true output csv. default output is ndjson
+ - --geocode=true to add the lat and lon to the output
+
+All of the standard options are supported as well.
+
+
+
