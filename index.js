@@ -32,15 +32,16 @@ var inside = function (point, geopoly) {
  * Note, duplicates may occur.
  */
 var Hasher = function (options) {
+  options = options || {};
   var defaults = {
-    precision: 6,
+    precision: options.integerMode === true ? 32 : 6,
     rowMode: false,
+    integerMode: false,
     geojson: [],
     splitAt: 2000,
     hashMode: 'inside',
     threshold: 0
   };
-  options = options || {};
   for (var attrname in defaults) {
     this[attrname] = options.hasOwnProperty(attrname) && (options[attrname] !== null && typeof options[attrname] !== 'undefined') ? options[attrname] : defaults[attrname];
   }
@@ -50,6 +51,17 @@ var Hasher = function (options) {
   this.geojson = this.geojson.map(function (el) {
     return turf.polygon(el);
   });
+  if (this.integerMode) {
+  	this.geohashEncode = geohash.encode_int;
+  	this.geohashDecode = geohash.decode_int;
+  	this.geohashDecodeBbox = geohash.decode_bbox_int;
+  	this.geohashNeighbor = geohash.neighbor_int;
+  } else {
+  	this.geohashEncode = geohash.encode;
+  	this.geohashDecode = geohash.decode;
+  	this.geohashDecodeBbox = geohash.decode_bbox;
+  	this.geohashNeighbor = geohash.neighbor;
+  }
 
   Readable.call(this, {
     objectMode: this.rowMode
@@ -97,10 +109,10 @@ Hasher.prototype.getNextRow = function (done) {
   var makeRow = function () {
 
     if(!self.rowHash) {
-      self.rowHash = geohash.encode(self.bounding[2], self.bounding[1], self.precision);
+      self.rowHash = self.geohashEncode(self.bounding[2], self.bounding[1], self.precision);
     }
 
-    var rowBox = geohash.decode_bbox(self.rowHash),
+    var rowBox = self.geohashDecodeBbox(self.rowHash, self.precision),
       columnHash = self.rowHash,
       rowBuffer = 0.0002,
       rowHashes = [];
@@ -127,7 +139,7 @@ Hasher.prototype.getNextRow = function (done) {
               // extent = [minX, minY, maxX, maxY], remap to match geohash lib
               self.rowBounding = [extent[1], extent[0], extent[3], extent[2]];
               var midY = self.rowBounding[0]+(self.rowBounding[2]-self.rowBounding[0])/2;
-              columnHash = geohash.encode(midY, self.rowBounding[1], self.precision);
+              columnHash = self.geohashEncode(midY, self.rowBounding[1], self.precision);
               next(err, intersection.features[0]);
             });
           } else {
@@ -142,19 +154,19 @@ Hasher.prototype.getNextRow = function (done) {
 
 
     preparePoly(function (err, prepared) {
-      var columnCenter = geohash.decode(columnHash),
-        westerly = geohash.neighbor(geohash.encode(columnCenter.latitude, self.rowBounding[3], self.precision), [0, 1]);
+      var columnCenter = self.geohashDecode(columnHash, self.precision),
+        westerly = self.geohashNeighbor(self.geohashEncode(columnCenter.latitude, self.rowBounding[3], self.precision), [0, 1], self.precision);
       while (columnHash != westerly) {
         if(self.hashMode === 'inside' && inside(columnCenter, prepared)) {
           rowHashes.push(columnHash);
         } else if (self.hashMode === 'intersect' || self.hashMode === 'extent') {
           rowHashes.push(columnHash);
         }
-        columnHash = geohash.neighbor(columnHash, [0, 1]);
-        columnCenter = geohash.decode(columnHash);
+        columnHash = self.geohashNeighbor(columnHash, [0, 1], self.precision);
+        columnCenter = self.geohashDecode(columnHash, self.precision);
       }
 
-      var southNeighbour = geohash.neighbor(self.rowHash, [-1, 0]);
+      var southNeighbour = self.geohashNeighbor(self.rowHash, [-1, 0], self.precision);
 
       // Check if the current rowHash was already the most southerly hash on the map.
       // Also check if we are at or past the bottom of the bounding box.
@@ -173,7 +185,7 @@ Hasher.prototype.getNextRow = function (done) {
 
         var baseArea = null;
         async.filter(rowHashes, function (h, cb) {
-          var bb = geohash.decode_bbox(h);
+          var bb = self.geohashDecodeBbox(h, self.precision);
           bb = turf.polygon([[
                 [bb[1], bb[2]],
                 [bb[3], bb[2]],
@@ -241,6 +253,7 @@ var streamer = module.exports.stream = function (options) {
     geojson: options.coords,
     precision: options.precision,
     rowMode: options.rowMode ? true : false,
+    integerMode: options.integerMode ? true : false,
     hashMode: options.hashMode,
     threshold: options.threshold
   });
