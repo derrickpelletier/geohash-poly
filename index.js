@@ -1,7 +1,16 @@
 var Readable = require('stream').Readable,
   geohash = require('ngeohash'),
   pip = require('point-in-polygon'),
-  turf = require('turf'),
+  turfExtent = require('turf-extent'),
+  turfFeaturecollection = require('turf-featurecollection'),
+  turfPolygon = require('turf-polygon'),
+  turfIntersect = require('turf-intersect'),
+  turf = {
+  	extent: turfExtent,
+  	featurecollection: turfFeaturecollection,
+  	polygon: turfPolygon,
+  	intersect: turfIntersect
+  },
   through2 = require('through2'),
   async = require('async'),
   geojsonArea = require('geojson-area');
@@ -129,24 +138,22 @@ Hasher.prototype.getNextRow = function (done) {
           [ self.bounding[1] - rowBuffer, rowBox[2] + rowBuffer] //nw
         ]]);
         
-        turf.intersect(turf.featurecollection([clipper]), turf.featurecollection([currentGeojson]), function (err, intersection) {
-          var prepare = null;
-          if(intersection && intersection.features.length) {
+        var intersection = turf.intersect(clipper, currentGeojson);
+        var prepare = null;
+        if(intersection && intersection.features.length) {
 
-            // Calculate the row bounding and column hash based on the intersection
-            var intersectionFeature = { type: 'Feature', geometry: intersection.features[0], properties: {} };
-            turf.extent(turf.featurecollection([intersectionFeature]), function (err, extent) {
-              // extent = [minX, minY, maxX, maxY], remap to match geohash lib
-              self.rowBounding = [extent[1], extent[0], extent[3], extent[2]];
-              var midY = self.rowBounding[0]+(self.rowBounding[2]-self.rowBounding[0])/2;
-              columnHash = self.geohashEncode(midY, self.rowBounding[1], self.precision);
-              next(err, intersection.features[0]);
-            });
-          } else {
-            next(null, currentGeojson.geometry);
-          }
-        });
-
+          // Calculate the row bounding and column hash based on the intersection
+          var intersectionFeature = { type: 'Feature', geometry: intersection.features[0], properties: {} };
+          var extent = turf.extent(turf.featurecollection([intersectionFeature]));
+          // extent = [minX, minY, maxX, maxY], remap to match geohash lib
+          self.rowBounding = [extent[1], extent[0], extent[3], extent[2]];
+          var midY = self.rowBounding[0]+(self.rowBounding[2]-self.rowBounding[0])/2;
+          columnHash = self.geohashEncode(midY, self.rowBounding[1], self.precision);
+          next(err, intersection.features[0]);
+        } else {
+          next(null, currentGeojson.geometry);
+        }
+ 
       } else {
           next(null, currentGeojson.geometry);
       }
@@ -196,14 +203,13 @@ Hasher.prototype.getNextRow = function (done) {
 
           if(!baseArea) baseArea = geojsonArea.geometry(bb.geometry);
 
-          turf.intersect(turf.featurecollection([turf.polygon(prepared.coordinates)]), turf.featurecollection([bb]), function (err, intersected) {
-            var keepIntersection = !self.threshold ? true : false;
-            if(self.threshold && intersected.features.length && (intersected.features[0].type === 'Polygon' || intersected.features[0].type === 'MultiPolygon')) {
-              var intersectedArea = geojsonArea.geometry(intersected.features[0]);
-              keepIntersection = baseArea && intersectedArea / baseArea >= self.threshold;
-            }
-            cb(keepIntersection);
-          });
+          var intersected = turf.intersect(turf.polygon(prepared.coordinates), bb);
+          var keepIntersection = !self.threshold ? true : false;
+          if(self.threshold && intersected.features.length && (intersected.features[0].type === 'Polygon' || intersected.features[0].type === 'MultiPolygon')) {
+            var intersectedArea = geojsonArea.geometry(intersected.features[0]);
+            keepIntersection = baseArea && intersectedArea / baseArea >= self.threshold;
+          }
+          cb(keepIntersection);
         }, function (results) {
           done(null, results);
         });
@@ -213,12 +219,11 @@ Hasher.prototype.getNextRow = function (done) {
   };
 
   if(!this.bounding) {
-    turf.extent(turf.featurecollection([currentGeojson]), function (err, extent) {
-      // extent = [minX, minY, maxX, maxY], remap to match geohash lib
-      self.bounding = [extent[1], extent[0], extent[3], extent[2]];
-      self.rowBounding = self.bounding.slice(0);
-      makeRow();
-    });
+    var extent = turf.extent(turf.featurecollection([currentGeojson]));
+    // extent = [minX, minY, maxX, maxY], remap to match geohash lib
+    self.bounding = [extent[1], extent[0], extent[3], extent[2]];
+    self.rowBounding = self.bounding.slice(0);
+    makeRow();
   } else {
     makeRow();
   }
