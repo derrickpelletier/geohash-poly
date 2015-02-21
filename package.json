@@ -1,6 +1,6 @@
 {
   "name": "geohash-poly",
-  "version": "0.5.1",
+  "version": "0.5.2",
   "description": "Transform a GeoJSON Polygon or MultiPolygon to a list of geohashes that form it.",
   "main": "index.js",
   "bin": "./bin/cli.js",
@@ -24,7 +24,7 @@
     "through2": "~0.4.0",
     "turf-extent": "1.0.4",
     "turf-featurecollection": "1.0.1",
-    "turf-intersect": "1.4.1",
+    "turf-intersect": "1.0.2",
     "turf-polygon": "1.0.3"
   },
   "devDependencies": {

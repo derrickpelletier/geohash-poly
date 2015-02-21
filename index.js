@@ -138,10 +138,8 @@ Hasher.prototype.getNextRow = function (done) {
           [ self.bounding[1] - rowBuffer, rowBox[2] + rowBuffer] //nw
         ]]);
         
-        var intersection = turf.intersect(clipper, currentGeojson);
-        var prepare = null;
+        var intersection = turf.intersect(turf.featurecollection([clipper]), turf.featurecollection([currentGeojson]));
         if(intersection && intersection.features.length) {
-
           // Calculate the row bounding and column hash based on the intersection
           var intersectionFeature = { type: 'Feature', geometry: intersection.features[0], properties: {} };
           var extent = turf.extent(turf.featurecollection([intersectionFeature]));
@@ -149,7 +147,7 @@ Hasher.prototype.getNextRow = function (done) {
           self.rowBounding = [extent[1], extent[0], extent[3], extent[2]];
           var midY = self.rowBounding[0]+(self.rowBounding[2]-self.rowBounding[0])/2;
           columnHash = self.geohashEncode(midY, self.rowBounding[1], self.precision);
-          next(err, intersection.features[0]);
+          next(null, intersection.features[0]);
         } else {
           next(null, currentGeojson.geometry);
         }
@@ -203,7 +201,7 @@ Hasher.prototype.getNextRow = function (done) {
 
           if(!baseArea) baseArea = geojsonArea.geometry(bb.geometry);
 
-          var intersected = turf.intersect(turf.polygon(prepared.coordinates), bb);
+          var intersected = turf.intersect(turf.featurecollection([turf.polygon(prepared.coordinates)]), turf.featurecollection([bb]));
           var keepIntersection = !self.threshold ? true : false;
           if(self.threshold && intersected.features.length && (intersected.features[0].type === 'Polygon' || intersected.features[0].type === 'MultiPolygon')) {
             var intersectedArea = geojsonArea.geometry(intersected.features[0]);
