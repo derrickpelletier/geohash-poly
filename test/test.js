@@ -17,7 +17,8 @@ require('joe').describe('geohash-poly', function (describe, it) {
         self.pause();
 
         async.timesSeries(geojson.properties.maxPrecision, function (n, next) {
-          var precision = n + 1;
+          var precision = n + 1,
+          	  integerPrecision = precision * 5;
           var options = {
             coords: geojson.geometry.coordinates,
             precision: precision,
@@ -38,6 +39,25 @@ require('joe').describe('geohash-poly', function (describe, it) {
               done();
             });
           });
+          if (integerPrecision % 2 == 0) { // https://github.com/sunng87/node-geohash says: "Bit depth must be even."
+	          it('should geohash ' + geojson.properties.comment + ' shape. Precision ' + integerPrecision + '. hashMode "extent" and integerMode true.', function (done) {
+	            options.integerMode = true;
+	            options.precision = integerPrecision; 
+	            hasher(options, function (err, hashes) {
+	              should.not.exist(err);
+	              hashes.length.should.equal(geojson.properties.expectedExtent[n]);
+	              done();
+	            });
+	          });
+	          it('should geohash ' + geojson.properties.comment + ' shape. Precision ' + integerPrecision + '. hashMode "inside" and integerMode true.', function (done) {
+	            options.hashMode = 'inside';
+	            hasher(options, function (err, hashes) {
+	              should.not.exist(err);
+	              hashes.length.should.equal(geojson.properties.expectedInside[n]);
+	              done();
+	            });
+	          });
+          }
           next();
         }, function (err) {
           self.resume();
