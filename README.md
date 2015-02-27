@@ -54,13 +54,37 @@ Results in:
 [ 'c22zrgg', 'c22zrgu', 'c22zrgv', 'c22zrgy', 'c22zrgz', 'c23p25b', 'c22zrge', 'c22zrgs', 'c22zrgt', 'c22zrgw', 'c22zrgx', 'c23p258', 'c23p259', 'c23p25d', 'c22zrg7', 'c22zrgk', 'c22zrgm', 'c22zrgq', 'c22zrgr', 'c23p252', 'c23p253', 'c23p256', 'c22zrg5', 'c22zrgh', 'c22zrgj', 'c22zrgn', 'c22zrgp', 'c23p250', 'c23p251', 'c23p254' ]
 ```
 
+Also, integer geohashes are available.
+```javascript
+
+geohashpoly({coords: polygon, precision: 34, integerMode: true}, function (err, hashes) {
+    console.log(hashes);
+});
+```
+
+Results in:
+```
+[ 5940702973,
+  5940702975,
+  5941052501,
+  5940702972,
+  5940702974,
+  5941052500,
+  5940702969,
+  5940702971,
+  5941052497,
+  5940702968,
+  5940702970,
+  5941052496 ]
+```
+
 ## Options
 
 - `coords`: coordinate array for the geojson shape. **required**
 - `precision`: geohash precision (eg. "gfjf1" is a precision 5 geohash).
 - `rowMode`: allows for processing of geohashes by row.
 - `hashMode`: defines filtering of returned geohashes. See below.
-
+- `integerMode`: (true/false) Outputs integer versions of geohashes. Default precision for integer mode is 32 bits. 
 
 
 ## hashMode
