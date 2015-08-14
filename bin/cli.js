@@ -1,3 +1,5 @@
+#!/usr/bin/env node
+
 var hasher = require('..');
 var through2 = require('through2');
 var geohash = require('ngeohash');
