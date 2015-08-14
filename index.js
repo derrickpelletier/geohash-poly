@@ -20,12 +20,12 @@ var Readable = require('stream').Readable,
  */
 var inside = function (point, geopoly) {
   var inside = 0;
-  
+
   if(geopoly.type !== "Polygon" && geopoly.type !== "MultiPolygon") return false;
-  
+
   var shape = geopoly.type === 'Polygon' ? [geopoly.coordinates] : geopoly.coordinates;
-  shape.forEach(function (polygon, ind) {
-    polygon.forEach(function (ring, ind) {
+  shape.forEach(function (polygon) {
+    polygon.forEach(function (ring) {
       if(pip([point.longitude, point.latitude], ring)) inside++;
     });
   });
@@ -85,7 +85,7 @@ require('util').inherits(Hasher, Readable);
  * If not in rowMode, will push each hash to buffer
  * if there are no polygons remaining in the geojson, push null to end stream
  */
-Hasher.prototype._read = function (size) {
+Hasher.prototype._read = function () {
   var self = this;
   var hashes = [];
   async.whilst(function () {
@@ -130,14 +130,14 @@ Hasher.prototype.getNextRow = function (done) {
       // Detect poly length
       if(self.hashMode !== 'extent' && currentGeojson.geometry.coordinates[0].length >= self.splitAt) {
 
-        clipper = turf.polygon([[
+        var clipper = turf.polygon([[
           [ self.bounding[1] - rowBuffer, rowBox[2] + rowBuffer], // nw
           [ self.bounding[3] + rowBuffer, rowBox[2] + rowBuffer], // ne
           [ self.bounding[3] + rowBuffer, rowBox[0] - rowBuffer], // se
           [ self.bounding[1] - rowBuffer, rowBox[0] - rowBuffer], //sw
           [ self.bounding[1] - rowBuffer, rowBox[2] + rowBuffer] //nw
         ]]);
-        
+
         var intersection = turf.intersect(turf.featurecollection([clipper]), turf.featurecollection([currentGeojson]));
         if(intersection && intersection.features.length) {
           // Calculate the row bounding and column hash based on the intersection
@@ -151,7 +151,7 @@ Hasher.prototype.getNextRow = function (done) {
         } else {
           next(null, currentGeojson.geometry);
         }
- 
+
       } else {
           next(null, currentGeojson.geometry);
       }
@@ -161,7 +161,7 @@ Hasher.prototype.getNextRow = function (done) {
     preparePoly(function (err, prepared) {
       var columnCenter = self.geohashDecode(columnHash, self.precision),
         westerly = self.geohashNeighbor(self.geohashEncode(columnCenter.latitude, self.rowBounding[3], self.precision), [0, 1], self.precision);
-      while (columnHash != westerly) {
+      while (columnHash !== westerly) {
         if(self.hashMode === 'inside' && inside(columnCenter, prepared)) {
           rowHashes.push(columnHash);
         } else if (self.hashMode === 'intersect' || self.hashMode === 'extent') {
@@ -225,14 +225,30 @@ Hasher.prototype.getNextRow = function (done) {
   } else {
     makeRow();
   }
-    
+
+};
+
+
+/**
+ * initializes the Hasher, as a stream
+ */
+// var streamer = module.exports.stream = function (coords, precision, rowMode, hashMode) {
+var streamer = function (options) {
+  return new Hasher({
+    geojson: options.coords,
+    precision: options.precision,
+    rowMode: options.rowMode ? true : false,
+    integerMode: options.integerMode ? true : false,
+    hashMode: options.hashMode,
+    threshold: options.threshold
+  });
 };
 
 
 /**
  * intializes the Hasher, but processes the results before returning an array.
  */
-var polygonHash = module.exports = function (options, next) {
+module.exports = function (options, next) {
   options.rowMode = true;
   var hasher = streamer(options);
   var results = [];
@@ -246,18 +262,4 @@ var polygonHash = module.exports = function (options, next) {
     }));
 };
 
-
-/**
- * initializes the Hasher, as a stream
- */
-// var streamer = module.exports.stream = function (coords, precision, rowMode, hashMode) {
-var streamer = module.exports.stream = function (options) {
-  return new Hasher({
-    geojson: options.coords,
-    precision: options.precision,
-    rowMode: options.rowMode ? true : false,
-    integerMode: options.integerMode ? true : false,
-    hashMode: options.hashMode,
-    threshold: options.threshold
-  });
-};
+module.exports.stream = streamer;
